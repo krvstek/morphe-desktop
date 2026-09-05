@@ -59,7 +59,7 @@ jobs:
           _JAVA_OPTIONS: "-Djava.awt.headless=true"
         run: |
           chmod +x ./gradlew
-          ./gradlew classes
+          ./gradlew generateComposeResClass
 
       # Step 3: Checkout dev branch to prepare for merging
       - name: Checkout dev branch for merge
