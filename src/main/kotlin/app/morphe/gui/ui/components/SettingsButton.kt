@@ -114,12 +114,6 @@ fun SettingsDialogHost() {
         loadSettings()
     }
 
-    LaunchedEffect(showSettingsDialog) {
-        if (showSettingsDialog) {
-            loadSettings()
-        }
-    }
-
     if (showSettingsDialog) {
         SettingsDialog(
             currentLanguage = languageState.current,
