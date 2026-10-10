@@ -43,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -71,7 +72,10 @@ import app.morphe.gui.ui.theme.LocalMorpheFont
 import app.morphe.gui.ui.theme.MorpheAccentColors
 import app.morphe.gui.ui.theme.MorpheCornerStyle
 import app.morphe.morphe_desktop.generated.resources.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 
 /**
  * Desktop modal dialog for picking the application language.
@@ -83,21 +87,27 @@ fun LanguageDialog(
     onLanguageSelected: (String) -> Unit,
     onDismiss: () -> Unit,
     font: FontFamily = LocalMorpheFont.current,
-    languageRepository: LanguageRepository = remember { LanguageRepository() }
+    languageRepository: LanguageRepository = koinInject()
 ) {
     val accents = LocalMorpheAccents.current
     val corners = LocalMorpheCorners.current
     val borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
 
     var searchQuery by remember { mutableStateOf("") }
-    val filteredLanguages = remember(searchQuery, languageRepository, currentLanguageCode) {
-        languageRepository.filterLanguages(searchQuery, currentLanguageCode)
+    val filteredLanguages by produceState(
+        initialValue = languageRepository.getCachedLanguages(currentLanguageCode) ?: emptyList(),
+        key1 = searchQuery,
+        key2 = currentLanguageCode
+    ) {
+        value = withContext(Dispatchers.Default) {
+            languageRepository.filterLanguages(searchQuery, currentLanguageCode)
+        }
     }
 
     val listState = rememberLazyListState()
 
     // Scroll to the currently selected language on initial load
-    LaunchedEffect(currentLanguageCode) {
+    LaunchedEffect(currentLanguageCode, filteredLanguages) {
         val selectedIndex = filteredLanguages.indexOfFirst {
             it.code.equals(currentLanguageCode, ignoreCase = true) ||
                     (currentLanguageCode.isBlank() && it.code == LanguageRepository.SYSTEM_CODE)
@@ -155,18 +165,20 @@ fun LanguageDialog(
                         .padding(4.dp)
                 ) {
                     if (filteredLanguages.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = stringResource(Res.string.settings_language_search_no_results),
-                                fontFamily = font,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Normal,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
+                        if (searchQuery.isNotBlank()) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = stringResource(Res.string.settings_language_search_no_results),
+                                    fontFamily = font,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Normal,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     } else {
                         LazyColumn(
